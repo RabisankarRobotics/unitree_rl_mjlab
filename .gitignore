@@ -1,14 +1,58 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
 *.egg-info
-.idea
-outputs
-logs
-wandb
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Virtual environments (conda envs live outside the repo, but just in case)
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Training artifacts  -- these are produced on the training machine and should
+# never be pushed. Checkpoints, TensorBoard events and exported ONNX all land
+# under logs/rsl_rl/<experiment>/<timestamp>/.
+# ---------------------------------------------------------------------------
+logs/
+outputs/
+wandb/
 MUJOCO_LOG.TXT
-deploy/robots/go2/build
-deploy/robots/g1/build
-deploy/robots/h1_2/build
-deploy/robots/g1_23dof/build
-deploy/robots/r1/build
-deploy/robots/a2/build
-src/assets/motions/g1/dance1_subject2.npz
-simulate/build
+
+# Generated motion files (created from the .csv by scripts/csv_to_npz.py).
+# The source .csv files stay tracked.
+src/assets/motions/**/*.npz
+
+# ---------------------------------------------------------------------------
+# C++ deployment / simulate builds
+# ---------------------------------------------------------------------------
+deploy/robots/*/build/
+simulate/build/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# NOT ignored, on purpose:
+#   deploy/robots/*/config/policy/**/exported/*.onnx   trained policies you ship
+#   deploy/robots/*/config/policy/**/params/*.yaml     hand-written deploy.yaml
+#   deploy/thirdparty/**/*.so, simulate/mujoco/**/*.so vendored libraries
+# Do not add blanket *.onnx / *.so / *.npz rules -- they would hide these.
+# ---------------------------------------------------------------------------
