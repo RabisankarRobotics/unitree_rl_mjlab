@@ -44,3 +44,10 @@ from .unitree_h2.h2_constants import (
 from .unitree_h2.h2_constants import (
   get_h2_robot_cfg as get_h2_robot_cfg,
 )
+
+from .tahiti_c1.c1_constants import (
+  C1_ACTION_SCALE as C1_ACTION_SCALE,
+)
+from .tahiti_c1.c1_constants import (
+  get_tahiti_c1_robot_cfg as get_tahiti_c1_robot_cfg,
+)
