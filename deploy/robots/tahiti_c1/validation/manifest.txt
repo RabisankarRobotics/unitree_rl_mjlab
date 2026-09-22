@@ -1,0 +1,30 @@
+Tahiti C1 policy reference vectors
+  onnx sha256 : 1998ecaba04fa9eaa90cb7957b86d5870836fa74c97ac11eac32faac8c4a3a49
+  mnn  sha256 : ac5579104d23c082b990bc39c52fdc58a2bb613cc7d0f083944e89a7d0e8762a
+  cases       : 23
+  obs dim     : 47   action dim: 12
+
+case                               |action|_max  note
+all_zeros                               1.23896  Degenerate input. Easiest possible check that plumbing and b
+all_ones                               21.69955  Degenerate input, non-zero. Catches a normalizer that was dr
+stand_home                              0.30007  Exact home pose, upright, zero command, phase zeroed. This i
+stand_tilt_fwd                          0.79180  Standing, pitched forward ~10 deg. Checks proj_gravity sign 
+stand_tilt_left                         0.39641  Standing, rolled left ~10 deg.
+walk_fwd_phase0p00                      1.58017  Forward 0.8 m/s at gait phase 0.00. Exercises the sin/cos en
+walk_fwd_phase0p25                      1.13080  Forward 0.8 m/s at gait phase 0.25. Exercises the sin/cos en
+walk_fwd_phase0p50                      4.58837  Forward 0.8 m/s at gait phase 0.50. Exercises the sin/cos en
+walk_fwd_phase0p75                      1.30334  Forward 0.8 m/s at gait phase 0.75. Exercises the sin/cos en
+cmd_fwd_max                             1.16947  Max trained forward command (1.2 m/s).
+cmd_back_max                            1.07520  Max trained backward command (-0.8 m/s).
+cmd_strafe_left                         1.45016  Max lateral left. Note lateral tracking measured ~23% in sim
+cmd_strafe_right                        1.16424  Max lateral right.
+cmd_yaw_left                            1.21960  Max yaw left.
+cmd_yaw_right                           1.65777  Max yaw right.
+cmd_combined                            0.86312  Simultaneous forward + lateral + yaw, mid-stride.
+DIAG_zero_cmd_phase_running             0.64161  DIAGNOSTIC for blocker 1. Zero command but phase NOT zeroed 
+DIAG_cmd_just_below_thresh              0.32315  Command just under the 0.1 zero threshold -- phase must be z
+DIAG_cmd_just_above_thresh              0.49290  Command just over the 0.1 zero threshold -- phase must be li
+random_0                                2.23697  Randomised but physically plausible state (seed 20260919).
+random_1                                2.38270  Randomised but physically plausible state (seed 20260919).
+random_2                                4.42486  Randomised but physically plausible state (seed 20260919).
+random_3                                2.33181  Randomised but physically plausible state (seed 20260919).
