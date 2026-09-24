@@ -1,44 +1,40 @@
-"""Tahiti C1 velocity environment configurations.
+"""Tahiti C1 velocity environments -- HAND-TUNED actuator variant.
 
-SELF-CONTAINED. Unlike the other robots in this repo, this file does NOT call
-``make_velocity_env_cfg()``. Every observation, action, command, event, reward,
-termination and curriculum term is written out here, with this robot's values
-already substituted. Nothing is inherited, so what you read is what runs.
+This file is a copy of config/tahiti_c1/env_cfgs.py, the configuration that
+actually produced a walking policy (reward 45.26, episode length 1000/1000,
+fell_over 0.0000 after 10k iterations). The ONLY difference is the robot:
 
-Only the term *functions* are imported (``src.tasks.velocity.mdp``); those are a
-library of reward/observation implementations, not configuration.
+    get_tahiti_c1_robot_cfg   ->  get_tahiti_c1_tuned_robot_cfg
+    C1_ACTION_SCALE           ->  C1_TUNED_ACTION_SCALE
 
-Layout
-------
-  1. Robot-specific constants   <- start here when tuning
-  2. Sensors
-  3. Observations
-  4. Actions
-  5. Commands
-  6. Events (domain randomisation)
-  7. Rewards
-  8. Terminations
-  9. Curriculum
- 10. Assembly (scene / sim / viewer)
- 11. Flat variant + play overrides
+so the actuator model is the single variable under test.
 
-Tuning guide
-------------
-  robot sags, crouches, weak                  -> gains, in c1_constants.py
-  jitter, buzzing, huge action_rate penalty   -> gains, in c1_constants.py
-  never leaves the ground / shuffles          -> FOOT_CLEARANCE up, foot_clearance weight up
-  stomps, slaps the ground                    -> soft_landing weight more negative
-  drags feet, trips on rough terrain          -> FOOT_CLEARANCE up
-  feet slide during stance                    -> foot_slip weight more negative
-  gait is not alternating / hops              -> foot_gait weight up, check GAIT_PERIOD
-  torso wobbles, arms-out look                -> body_ang_vel / angular_momentum more negative
-  falls constantly early in training           -> lower CMD_* ranges, lengthen curriculum stage 0
-  tracks velocity poorly                      -> track_* weights up, or pose weight down
-  won't stand still on zero command           -> stand_still weight more negative
-  terminates too early on rough terrain       -> FELL_OVER_ANGLE up
+HISTORY -- why this was reverted
+--------------------------------
+An earlier version of this file stacked five extra DR terms (pd_gains,
+joint_friction, joint_armature, body_impulse, reset scatter) on top. Measured
+outcomes:
 
-See doc/actuator_tuning.md for the gain derivation and
-``python scripts/check_actuators.py`` to re-verify gains after a model change.
+  * All five from step 0: the policy never learned at all. Action std climbed
+    to 1.03 instead of converging, 100% of episodes ended in a fall.
+  * Ramped in by curriculum: it survived (episode length 964, no falls) but
+    collapsed into a standing local optimum. Verified directly -- commanded
+    0.3/0.6/0.8 m/s all gave achieved velocity of -0.001 m/s.
+
+The standing optimum is stable because `pose` (0.86) out-earns
+`track_linear_velocity` (0.40) while `is_terminated` (-200) makes any attempt
+to walk a bad bet once disturbances can knock the robot over.
+
+So: get a walking gait with this known-good reward structure first, then add DR
+back incrementally -- one term at a time, checking that achieved velocity still
+tracks the command. The ablation that measured which terms are safe is kept in
+git history on this file.
+
+SELF-CONTAINED: every observation, action, command, event, reward, termination
+and curriculum term is written out below. Nothing is inherited.
+
+Registered as Tahiti-C1-Tuned-Flat / Tahiti-C1-Tuned-Rough, alongside the
+derived Tahiti-C1-Flat / -Rough.
 """
 
 import math
@@ -73,7 +69,7 @@ from mjlab.utils.noise import UniformNoiseCfg as Unoise
 from mjlab.viewer import ViewerConfig
 
 import src.tasks.velocity.mdp as mdp
-from src.assets.robots import C1_ACTION_SCALE, get_tahiti_c1_robot_cfg
+from src.assets.robots import C1_TUNED_ACTION_SCALE, get_tahiti_c1_tuned_robot_cfg
 
 # ============================================================================
 # 1. ROBOT-SPECIFIC CONSTANTS  -- the things you are most likely to change
@@ -120,35 +116,7 @@ EPISODE_LENGTH_S = 20.0
 # tensor alone. If you later learn WHERE the extra mass sits, put it in the URDF
 # instead and shrink this range to the leftover uncertainty: domain randomisation
 # should cover what you do not know, not a systematic offset you do know.
-PAYLOAD_MASS_KG = (4.0, 6.0)
-
-# --- startup domain randomisation, all multiplicative ------------------------
-# Insurance against exactly the class of error that caused the first hardware
-# failure: the deployed PD gains not matching what the policy trained on.
-# pd_gains additionally covers the ankle linkage, whose effective joint gain is
-# J^T diag(kp) J -- about 4.7x at the home pose, swinging 4.6-9.6 over a stride.
-DR_KP_RANGE = (0.8, 1.2)  # +/-20%
-DR_KD_RANGE = (0.8, 1.2)  # +/-20%
-DR_FRICTION_RANGE = (0.8, 1.2)  # +/-20%
-DR_ARMATURE_RANGE = (0.8, 1.2)  # +/-20%
-
-# --- episode start-state scatter ---------------------------------------------
-# Deliberately moderate. Measured (200 iters, 2048 envs): full scatter of
-# +/-0.5 base velocity with +/-0.1 rad joint offsets cost early learning
-# (ep_len 294 vs 339 for a softer setting), and stacking it with body_impulse
-# stopped learning entirely. These sit between "off" and that full setting.
-# Joint offsets are clamped to the soft limits (soft_joint_pos_limit_factor),
-# so a scattered start cannot spawn against a hard stop.
-RESET_BASE_VEL_RANGE = {
-  "x": (-0.3, 0.3),
-  "y": (-0.3, 0.3),
-  "z": (-0.15, 0.15),
-  "roll": (-0.3, 0.3),
-  "pitch": (-0.3, 0.3),
-  "yaw": (-0.3, 0.3),
-}
-RESET_JOINT_POS_RANGE = (-0.05, 0.05)  # rad, ~2.9 deg per joint
-RESET_JOINT_VEL_RANGE = (-0.25, 0.25)  # rad/s
+PAYLOAD_MASS_KG = (4.0, 5.0)
 
 # Posture reward spreads, per joint regex. Wider std = more freedom.
 # Knees/hip_pitch loosest (leg bending during stride); hip roll/yaw tighter
@@ -156,38 +124,24 @@ RESET_JOINT_VEL_RANGE = (-0.25, 0.25)  # rad/s
 POSE_STD_STANDING = {".*": 0.05}
 POSE_STD_WALKING = {
   r".*hip_pitch.*": 0.5,
-  # hip_roll and hip_yaw loosened 0.15 -> 0.30, ankle_roll 0.10 -> 0.15.
-  #
-  # These are the joints that turning and side-stepping actually need, and at
-  # std 0.15 the pose reward was paying the policy to keep them still. Measured
-  # with the 5800-iteration checkpoint: turning at 0.8 rad/s used only 0.196 rad
-  # of hip_yaw and strafing at 0.4 m/s only 0.100 rad of hip_roll -- the robot
-  # was pivoting on planted feet instead of stepping round.
-  #
-  # The reward is exp(-(q/std)^2), so at std 0.15 a 0.30 rad step-turn scores
-  # 0.018 for that joint -- essentially the whole term lost. At std 0.30 the
-  # same excursion scores 0.37, which is affordable.
-  #
-  # (These values were inherited from G1's lower body; C1's hip_yaw range is
-  # only +/-0.44 rad, so the same std is proportionally much tighter here.)
-  r".*hip_roll.*": 0.30,
-  r".*hip_yaw.*": 0.30,
+  r".*hip_roll.*": 0.15,
+  r".*hip_yaw.*": 0.15,
   r".*knee.*": 0.5,
   r".*ankle_pitch.*": 0.15,
-  r".*ankle_roll.*": 0.15,
+  r".*ankle_roll.*": 0.1,
 }
 # Running values ~1.5-2x walking, to accommodate a larger motion range.
 POSE_STD_RUNNING = {
   r".*hip_pitch.*": 0.5,
-  r".*hip_roll.*": 0.35,
-  r".*hip_yaw.*": 0.35,
+  r".*hip_roll.*": 0.25,
+  r".*hip_yaw.*": 0.25,
   r".*knee.*": 0.5,
   r".*ankle_pitch.*": 0.25,
-  r".*ankle_roll.*": 0.15,
+  r".*ankle_roll.*": 0.1,
 }
 
 
-def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def tahiti_c1_tuned_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   """Tahiti C1 velocity tracking on generated rough terrain."""
 
   # ==========================================================================
@@ -235,15 +189,11 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "base_ang_vel": ObservationTermCfg(
       func=mdp.builtin_sensor,
       params={"sensor_name": "robot/imu_ang_vel"},
-      # Raised 0.2 -> 0.3 for sim2real: a BNO08x on a walking biped sees
-      # structural vibration on top of its datasheet noise floor.
-      noise=Unoise(n_min=-0.3, n_max=0.3),
+      noise=Unoise(n_min=-0.2, n_max=0.2),
     ),
     # 3 -- gravity direction in body frame; tells the policy which way is up.
     "projected_gravity": ObservationTermCfg(
       func=mdp.projected_gravity,
-      # 0.05 -> 0.08: this is a fused orientation ESTIMATE, not a raw reading,
-      # so it carries filter lag and slow drift the sim does not model.
       noise=Unoise(n_min=-0.05, n_max=0.05),
     ),
     # 3 -- commanded (vx, vy, wz).
@@ -259,17 +209,12 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # 12 -- joint positions relative to the default pose.
     "joint_pos": ObservationTermCfg(
       func=mdp.joint_pos_rel,
-      # 0.01 -> 0.03. The 17-bit encoders are far better than this, but the
-      # error that matters is calibration: hardware.yaml zero_offsets plus
-      # <=15 arcmin (0.0044 rad) of gearbox backlash, which drifts with use.
-      noise=Unoise(n_min=-0.03, n_max=0.03),
+      noise=Unoise(n_min=-0.01, n_max=0.01),
     ),
     # 12 -- joint velocities.
     "joint_vel": ObservationTermCfg(
       func=mdp.joint_vel_rel,
-      # 1.5 -> 2.0. Joint velocity is finite-differenced from encoder counts on
-      # hardware, which is considerably noisier than MuJoCo's exact qvel.
-      noise=Unoise(n_min=-2.0, n_max=2.0),
+      noise=Unoise(n_min=-1.5, n_max=1.5),
     ),
     # 12 -- previous action.
     "actions": ObservationTermCfg(func=mdp.last_action),
@@ -348,7 +293,7 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     "joint_pos": JointPositionActionCfg(
       entity_name="robot",
       actuator_names=(".*",),
-      scale=C1_ACTION_SCALE,
+      scale=C1_TUNED_ACTION_SCALE,
       use_default_offset=True,
     )
   }
@@ -394,20 +339,16 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
           "z": (0.0, 0.0),
           "yaw": (-3.14, 3.14),
         },
-        # Non-zero start velocity. Previously {} -- every episode began exactly
-        # at rest, so the policy only ever saw states it had itself created.
-        "velocity_range": RESET_BASE_VEL_RANGE,
+        "velocity_range": {},
       },
     ),
-    # Scatter the starting posture. Directly relevant to the hardware
-    # transition: at LB+Y the robot is in whatever pose READY left it in, with
-    # real calibration offsets, not the sim's exact default.
+    # Currently a no-op (zero ranges). Widen to start from varied poses.
     "reset_robot_joints": EventTermCfg(
       func=mdp.reset_joints_by_offset,
       mode="reset",
       params={
-        "position_range": RESET_JOINT_POS_RANGE,
-        "velocity_range": RESET_JOINT_VEL_RANGE,
+        "position_range": (-0.0, 0.0),
+        "velocity_range": (-0.0, 0.0),
         "asset_cfg": SceneEntityCfg("robot", joint_names=(".*",)),
       },
     ),
@@ -462,49 +403,6 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     # Torso centre-of-mass offset, +/- 5 cm on each axis. Models payload and
     # CAD error. Widen if the real robot carries a battery/compute you have not
     # modelled.
-    # --- added for sim2real ------------------------------------------------
-    # These three are startup-mode, so they model per-robot hardware variation
-    # rather than disturbing the policy mid-episode. Measured (200 iters, 2048
-    # envs): removing ALL startup DR changed learning not at all (ep_len 38 vs
-    # 37), so they cost nothing in trainability. The per-step disturbances
-    # (body_impulse, reset scatter) are deliberately NOT added -- those were
-    # measured to stop the policy learning to walk at all.
-    #
-    # Scales each actuator group's own value, so X12 and X6 keep their relative
-    # sizing and only the spread is shared.
-    "pd_gains": EventTermCfg(
-      mode="startup",
-      func=dr.pd_gains,
-      params={
-        "asset_cfg": SceneEntityCfg("robot"),
-        "kp_range": DR_KP_RANGE,
-        "kd_range": DR_KD_RANGE,
-        "operation": "scale",
-      },
-    ),
-    # Dry friction (dof_frictionloss), set from the datasheet backdrive torque.
-    # A single point estimate that drifts with temperature and wear.
-    "joint_friction": EventTermCfg(
-      mode="startup",
-      func=dr.joint_friction,
-      params={
-        "asset_cfg": SceneEntityCfg("robot"),
-        "operation": "scale",
-        "ranges": DR_FRICTION_RANGE,
-      },
-    ),
-    # Reflected inertia. Also carries the ankle linkage uncertainty: the sim
-    # models the ankle as two serial joints, while the real four-bar reflects
-    # ~4.7x more inertia into pitch and ~1.7x into roll.
-    "joint_armature": EventTermCfg(
-      mode="startup",
-      func=dr.joint_armature,
-      params={
-        "asset_cfg": SceneEntityCfg("robot"),
-        "operation": "scale",
-        "ranges": DR_ARMATURE_RANGE,
-      },
-    ),
     "base_com": EventTermCfg(
       mode="startup",
       func=dr.body_com_offset,
@@ -602,13 +500,9 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
         "asset_cfg": SceneEntityCfg("robot", site_names=FOOT_SITES),
       },
     ),
-    # -0.75, up from -0.25. At the old weight this contributed only -0.0149
-    # against a measured 0.70 m/s of foot slip during forward walking, so
-    # sliding was barely discouraged. Raised alongside the looser hip stds:
-    # loosening pose makes stepping affordable, this makes sliding expensive.
     "foot_slip": RewardTermCfg(
       func=mdp.feet_slip,
-      weight=-0.75,
+      weight=-0.25,
       params={
         "sensor_name": feet_ground_contact.name,
         "command_name": "twist",
@@ -691,7 +585,7 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 
   cfg = ManagerBasedRlEnvCfg(
     scene=SceneCfg(
-      entities={"robot": get_tahiti_c1_robot_cfg()},
+      entities={"robot": get_tahiti_c1_tuned_robot_cfg()},
       terrain=TerrainEntityCfg(
         terrain_type="generator",
         terrain_generator=replace(ROUGH_TERRAINS_CFG, curriculum=True),
@@ -742,14 +636,14 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
 # ============================================================================
 
 
-def tahiti_c1_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
+def tahiti_c1_tuned_flat_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
   """Tahiti C1 velocity tracking on flat ground.
 
   Identical to the rough config except for the five changes below. Train this
   one first: rough terrain additionally needs the height-scan observation and
   the terrain curriculum working, and you do not want to debug both at once.
   """
-  cfg = tahiti_c1_rough_env_cfg(play=False)
+  cfg = tahiti_c1_tuned_rough_env_cfg(play=False)
 
   # (1) Flat plane instead of a generated terrain.
   assert cfg.scene.terrain is not None

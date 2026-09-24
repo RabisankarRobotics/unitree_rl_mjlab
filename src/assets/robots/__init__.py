@@ -51,3 +51,12 @@ from .tahiti_c1.c1_constants import (
 from .tahiti_c1.c1_constants import (
   get_tahiti_c1_robot_cfg as get_tahiti_c1_robot_cfg,
 )
+
+# Hand-tuned variant: actuator values transcribed from the validated IsaacLab
+# config rather than derived from datasheets. See c1_tuned_constants.py.
+from .tahiti_c1.c1_tuned_constants import (
+  C1_TUNED_ACTION_SCALE as C1_TUNED_ACTION_SCALE,
+)
+from .tahiti_c1.c1_tuned_constants import (
+  get_tahiti_c1_tuned_robot_cfg as get_tahiti_c1_tuned_robot_cfg,
+)

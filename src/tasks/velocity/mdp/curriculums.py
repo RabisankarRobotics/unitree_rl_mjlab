@@ -105,3 +105,48 @@ def reward_weight(
     if env.common_step_counter > stage["step"]:
       reward_term_cfg.weight = stage["weight"]
   return torch.tensor([reward_term_cfg.weight])
+
+
+class EventParamStage(TypedDict):
+  """One stage of an event-parameter curriculum.
+
+  ``events`` maps an event term's name to the parameters to overwrite on it,
+  e.g. ``{"body_impulse": {"force_range": (-150.0, 150.0)}}``.
+  """
+
+  step: int
+  events: dict[str, dict]
+
+
+def event_params(
+  env: ManagerBasedRlEnv,
+  env_ids: torch.Tensor,
+  stages: list[EventParamStage],
+) -> torch.Tensor:
+  """Ramp event-term parameters in as training progresses.
+
+  Domain randomisation that is survivable for a competent policy can stop a
+  fresh one from ever finding a gait: it falls before it collects reward, PPO's
+  action std climbs instead of converging, and learning stalls. Starting the
+  disturbances near zero and raising them once walking works avoids paying for
+  a second training run.
+
+  The event manager reads ``term_cfg.params`` on every call, so overwriting
+  entries here takes effect on the next tick. Stages are applied in order, so
+  list them by increasing ``step`` and let later ones win.
+
+  Returns the index of the active stage, for logging.
+  """
+  del env_ids  # Unused.
+  active = 0
+  for i, stage in enumerate(stages):
+    if env.common_step_counter < stage["step"]:
+      continue
+    active = i
+    for term_name, params in stage["events"].items():
+      try:
+        term_cfg = env.event_manager.get_term_cfg(term_name)
+      except (ValueError, KeyError):
+        continue  # term removed (e.g. play mode); nothing to ramp
+      term_cfg.params.update(params)
+  return torch.tensor(float(active))

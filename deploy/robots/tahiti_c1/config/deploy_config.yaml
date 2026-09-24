@@ -1,0 +1,220 @@
+_generated:
+  by: scripts/export_deploy_config.py
+  at: '2026-09-23T06:34:03Z'
+  task: Tahiti-C1-Flat
+  run_dir: logs/rsl_rl/tahiti_c1_velocity/2026-09-23_10-08-34
+  warning: Auto-generated. Regenerate after retraining; do not hand-edit.
+policy:
+  onnx: logs/rsl_rl/tahiti_c1_velocity/2026-09-23_10-08-34/policy.onnx
+  input_name: obs
+  output_name: actions
+  obs_dim: 47
+  action_dim: 12
+  obs_normalization_baked_in: true
+  trained_obs_order: base_ang_vel,projected_gravity,command,phase,joint_pos,joint_vel,actions
+control:
+  control_dt: 0.02
+  control_hz: 50.0
+  physics_dt: 0.005
+  decimation: 4
+joints:
+- index: 0
+  name: left_hip_yaw_joint
+  default_pos: 0.0
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -0.4363
+  upper_limit: 0.4363
+- index: 1
+  name: left_hip_pitch_joint
+  default_pos: -0.225
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -2.0071
+  upper_limit: 2.1817
+- index: 2
+  name: left_hip_roll_joint
+  default_pos: 0.0
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -0.2618
+  upper_limit: 2.7925
+- index: 3
+  name: left_knee_joint
+  default_pos: 0.45
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: 0.0
+  upper_limit: 2.1817
+- index: 4
+  name: left_ankle_pitch_joint
+  default_pos: 0.225
+  kp: 42.857143
+  kd: 2.279098
+  effort_limit: 60.0
+  action_scale: 0.35
+  armature: 0.025386
+  frictionloss: 1.6
+  lower_limit: -0.5236
+  upper_limit: 0.8727
+- index: 5
+  name: left_ankle_roll_joint
+  default_pos: 0.0
+  kp: 42.857143
+  kd: 2.279098
+  effort_limit: 60.0
+  action_scale: 0.14
+  armature: 0.025386
+  frictionloss: 1.6
+  lower_limit: -0.1745
+  upper_limit: 0.1745
+- index: 6
+  name: right_hip_yaw_joint
+  default_pos: 0.0
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -0.4363
+  upper_limit: 0.4363
+- index: 7
+  name: right_hip_pitch_joint
+  default_pos: -0.225
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -2.0071
+  upper_limit: 2.1817
+- index: 8
+  name: right_hip_roll_joint
+  default_pos: 0.0
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: -2.7925
+  upper_limit: 0.2618
+- index: 9
+  name: right_knee_joint
+  default_pos: 0.45
+  kp: 228.571429
+  kd: 24.01904
+  effort_limit: 320.0
+  action_scale: 0.35
+  armature: 0.516
+  frictionloss: 3.8
+  lower_limit: 0.0
+  upper_limit: 2.1817
+- index: 10
+  name: right_ankle_pitch_joint
+  default_pos: 0.225
+  kp: 42.857143
+  kd: 2.279098
+  effort_limit: 60.0
+  action_scale: 0.35
+  armature: 0.025386
+  frictionloss: 1.6
+  lower_limit: -0.5236
+  upper_limit: 0.8727
+- index: 11
+  name: right_ankle_roll_joint
+  default_pos: 0.0
+  kp: 42.857143
+  kd: 2.279098
+  effort_limit: 60.0
+  action_scale: 0.14
+  armature: 0.025386
+  frictionloss: 1.6
+  lower_limit: -0.1745
+  upper_limit: 0.1745
+observation:
+  total_dim: 47
+  note: Concatenate in this exact order. joint_pos is (q - default_pos); joint_vel is raw qd. 'actions'
+    is the previous RAW network output, before action_scale is applied.
+  terms:
+  - name: base_ang_vel
+    dim: 3
+    slice:
+    - 0
+    - 3
+    scale: 1.0
+  - name: projected_gravity
+    dim: 3
+    slice:
+    - 3
+    - 6
+    scale: 1.0
+  - name: command
+    dim: 3
+    slice:
+    - 6
+    - 9
+    scale: 1.0
+  - name: phase
+    dim: 2
+    slice:
+    - 9
+    - 11
+    scale: 1.0
+  - name: joint_pos
+    dim: 12
+    slice:
+    - 11
+    - 23
+    scale: 1.0
+  - name: joint_vel
+    dim: 12
+    slice:
+    - 23
+    - 35
+    scale: 1.0
+  - name: actions
+    dim: 12
+    slice:
+    - 35
+    - 47
+    scale: 1.0
+action:
+  formula: q_target[i] = default_pos[i] + action_scale[i] * action[i]
+  note: Network output is unbounded; clamp q_target to joint limits on hardware.
+gait:
+  phase_period_s: 0.8
+  note: phase = (t mod period)/period; obs = [sin(2*pi*phase), cos(2*pi*phase)]. Both entries MUST be
+    zeroed when ||command|| < zero_command_threshold, or the robot keeps stepping in place when told to
+    stop.
+  zero_command_threshold: 0.1
+command:
+  note: Gamepad axes map here. Ranges are what the policy was trained on.
+  lin_vel_x:
+  - -0.8
+  - 1.2
+  lin_vel_y:
+  - -0.5
+  - 0.5
+  ang_vel_z:
+  - -1.0
+  - 1.0
+  deadzone: 0.1
