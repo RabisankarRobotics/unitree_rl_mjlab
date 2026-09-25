@@ -1,0 +1,7 @@
+string[] actuator_names
+---
+bool success
+string message
+string[] actuator_names
+float64[] offsets
+string[] calibration_references

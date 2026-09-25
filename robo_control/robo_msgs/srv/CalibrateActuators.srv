@@ -1,0 +1,7 @@
+string command
+string[] actuator_names
+---
+bool success
+string message
+float64[] offsets
+string[] actuator_names

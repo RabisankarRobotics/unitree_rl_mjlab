@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>policy_service</name>
+  <version>1.0.0</version>
+  <description>
+    Policy inference service for neural network control.
+  </description>
+  <maintainer email="maintainer@example.com">Robo Control</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rclcpp</depend>
+  <depend>robo_msgs</depend>
+  <depend>transport</depend>
+  <depend>common</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,44 @@
+[build-system]
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "ethercat-sdk"
+version = "1.0.0"
+description = "Python bindings for the ethercat_sdk EtherCAT motor control library"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "robo_control" }]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Topic :: Scientific/Engineering",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+cmake.build-type = "Release"
+# Build a single CPython 3.12+ stable-ABI wheel (cp312-abi3).
+wheel.py-api = "cp312"
+
+# Pure-Python part of the package (gets merged with the CMake-installed
+# `_core.abi3.so` to form the wheel).
+wheel.packages = ["python/ethercat_sdk"]
+
+# Bundle out-of-tree sources into the sdist so the wheel can be rebuilt from
+# `pip install <sdist>` without the rest of the repo.
+sdist.include = [
+  "../ethercat_sdk/include/**",
+  "../ethercat_sdk/src/**",
+  "../../common/include/**",
+]

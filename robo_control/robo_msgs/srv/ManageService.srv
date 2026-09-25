@@ -1,0 +1,5 @@
+string service_name
+string command # start, stop, restart, status
+---
+bool success
+string message
