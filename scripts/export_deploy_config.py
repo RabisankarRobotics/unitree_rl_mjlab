@@ -122,6 +122,7 @@ def main() -> None:
 
   twist = env_cfg.commands["twist"]
   phase_period = term_cfgs["phase"].params["period"]
+  history = int(env_cfg.observations["actor"].history_length)
 
   doc = {
     "_generated": {
@@ -149,7 +150,15 @@ def main() -> None:
     },
     "joints": joints,
     "observation": {
-      "total_dim": sum(dims),
+      "total_dim": in_dim,
+      # mjlab's group_obs_term_dim already multiplies each term by the history
+      # length, so `dim`/`slice` below describe the FLATTENED vector and
+      # single_step_dim has to divide the history back out.
+      "single_step_dim": sum(dims) // max(history, 1),
+      # Frames per term. Flattened TERM-MAJOR, oldest -> newest within a term:
+      # [A_t0..A_tH-1, B_t0..B_tH-1, ...]. robo_control's ObservationHistory
+      # uses the same layout, so no reordering is needed on the robot.
+      "history_length": history,
       "note": (
         "Concatenate in this exact order. joint_pos is (q - default_pos); "
         "joint_vel is raw qd. 'actions' is the previous RAW network output, "
@@ -189,7 +198,8 @@ def main() -> None:
   print(f"  policy      : {onnx_path.name}  ({in_dim} -> {out_dim})")
   print(f"  normalizer  : {'baked into graph' if norm_baked else 'EXTERNAL - apply in controller'}")
   print(f"  joints      : {len(joints)}")
-  print(f"  obs terms   : {len(obs)} totalling {sum(dims)}")
+  print(f"  obs terms   : {len(obs)} terms, {sum(dims) // max(history, 1)} per step "
+        f"x history {history} = {in_dim}")
   print(f"  control     : {1 / env.step_dt:.0f} Hz")
 
 

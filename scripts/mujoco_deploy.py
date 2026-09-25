@@ -18,7 +18,8 @@ Gamepad (Xbox layout)
 
 Control loop, matching training exactly:
     obs = [gyro(3), proj_gravity(3), cmd(3), phase(2),
-           q-default(12), qd(12), prev_action(12)]          -> 47, RAW
+           q-default(12), qd(12), prev_action(12)]          -> 47 per frame, RAW
+           x history_length, flattened TERM-MAJOR           -> 235 at history 5
     action   = onnx(obs)                                     -> 12, unbounded
     q_target = default_pos + action_scale * action
     tau      = clamp(kp*(q_target-q) - kd*qd, +/-effort)     (done by MuJoCo)
@@ -27,6 +28,7 @@ Control loop, matching training exactly:
 from __future__ import annotations
 
 import argparse
+import collections
 import math
 import pathlib
 import time
@@ -182,6 +184,9 @@ class PolicyController:
     self.upper = np.array([j["upper_limit"] for j in joints], dtype=np.float32)
 
     self.obs_dim = int(cfg["policy"]["obs_dim"])
+    obs_cfg = cfg.get("observation", {})
+    self.history = int(obs_cfg.get("history_length", 1))
+    self.single_dim = int(obs_cfg.get("single_step_dim", self.obs_dim))
     self.n = len(joints)
     self.control_dt = float(cfg["control"]["control_dt"])
     self.phase_period = float(cfg["gait"]["phase_period_s"])
@@ -202,6 +207,28 @@ class PolicyController:
   def reset(self) -> None:
     self.prev_action = np.zeros(self.n, dtype=np.float32)
     self.t = 0.0
+    # One ring buffer per term, matching robo_control's ObservationHistory.
+    # Seeded lazily on the first frame with `history` copies of it, exactly as
+    # the SDK does, so the two agree from the very first control cycle.
+    self._hist: list[collections.deque] | None = None
+
+  def _push_history(self, terms: list[np.ndarray]) -> np.ndarray:
+    """Append one frame and return the flattened TERM-MAJOR vector.
+
+    Layout: [A_t0..A_tH-1, B_t0..B_tH-1, ...], oldest -> newest within a term.
+    This is what mjlab produces with flatten_history_dim=True and what
+    policy_service::ObservationHistory::flatten() expects, so no reordering is
+    needed anywhere between training and the robot.
+    """
+    if self._hist is None:
+      self._hist = [
+        collections.deque([t.copy() for _ in range(self.history)], maxlen=self.history)
+        for t in terms
+      ]
+    else:
+      for buf, t in zip(self._hist, terms):
+        buf.append(t)
+    return np.concatenate([np.concatenate(b) for b in self._hist]).astype(np.float32)
 
   def build_obs(
     self, gyro: np.ndarray, proj_g: np.ndarray, cmd: np.ndarray,
@@ -214,9 +241,12 @@ class PolicyController:
     # Zeroed while standing, exactly as mdp.phase does during training.
     if np.linalg.norm(cmd) < self.zero_cmd_thresh:
       sc[:] = 0.0
-    obs = np.concatenate(
-      [gyro, proj_g, cmd, sc, q - self.default_pos, qd, self.prev_action]
-    ).astype(np.float32)
+    terms = [gyro, proj_g, cmd, sc, q - self.default_pos, qd, self.prev_action]
+    frame = np.concatenate(terms).astype(np.float32)
+    assert frame.shape[0] == self.single_dim, (
+      f"frame {frame.shape[0]} != single_step_dim {self.single_dim}"
+    )
+    obs = self._push_history(terms) if self.history > 1 else frame
     assert obs.shape[0] == self.obs_dim, f"obs {obs.shape[0]} != {self.obs_dim}"
     return obs
 

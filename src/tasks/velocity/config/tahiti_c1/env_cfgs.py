@@ -107,6 +107,23 @@ CMD_STANDING_THRESHOLD = 0.1
 # Terminate when the torso tilts past this.
 FELL_OVER_ANGLE = math.radians(70.0)
 
+# Observation history, frames per term. 1 = no history.
+#
+# The actor never observes base linear velocity (only the critic does), yet it
+# is asked to track a velocity command -- so with no history it has no direct
+# way to sense how fast it is travelling and must infer speed from joint state
+# and the gait clock alone. History is how a policy recovers unobserved state,
+# and it also gives it something to work with against the 0-30 ms actuator
+# delay. The policy that previously ran on this hardware used 5.
+#
+# Costs: actor obs 47 -> 235, critic 62 -> 310. The deployment interface changes
+# with it, so after training you must regenerate the deploy config, reconvert
+# the MNN, and set `observations.history_length: 5` in policy_mjlab.yaml.
+#
+# robo_control computes its input size from the actual term list times this
+# value, so 47 x 5 = 235 is handled correctly on the robot side.
+OBS_HISTORY_LENGTH = 5
+
 # Control rate: 0.005 s physics x 4 decimation = 50 Hz policy.
 # NOTE: c1_constants.DELAY_MIN_LAG/DELAY_MAX_LAG count physics steps, so they
 # depend on SIM_TIMESTEP. Change this and the actuator delay changes with it.
@@ -318,18 +335,23 @@ def tahiti_c1_rough_env_cfg(play: bool = False) -> ManagerBasedRlEnvCfg:
     ),
   }
 
+  # History of OBS_HISTORY_LENGTH frames per term, flattened TERM-MAJOR:
+  #   [A_t0..A_tH-1, B_t0..B_tH-1, ...]  (oldest -> newest within each term)
+  # This matches policy_service::ObservationHistory::flatten() in robo_control
+  # exactly, so the layout transfers to hardware without reordering. Verified
+  # against mjlab's ObservationTermCfg.flatten_history_dim documentation.
   observations = {
     "actor": ObservationGroupCfg(
       terms=actor_terms,
       concatenate_terms=True,
       enable_corruption=True,  # apply the noise above; disabled in play mode
-      history_length=1,
+      history_length=OBS_HISTORY_LENGTH,
     ),
     "critic": ObservationGroupCfg(
       terms=critic_terms,
       concatenate_terms=True,
       enable_corruption=False,
-      history_length=1,
+      history_length=OBS_HISTORY_LENGTH,
     ),
   }
 
